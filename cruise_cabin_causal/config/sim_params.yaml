@@ -1,0 +1,26 @@
+# Cruise cabin causal demo — DGP parameters
+# Modify only `seed` if you want a different draw from the same DGP.
+# All other parameters define the ground truth; change with care.
+
+seed: 42
+n_ships: 800
+n_months: 48
+start_month: "2021-01-01"
+
+# --- Causal parameters (ground truth) ---
+# True within-ship effect of one cabin category on log revenue per berth.
+# Cross-sectional OLS will overestimate this; panel FE and event study should recover it.
+beta_within_log_rpb: 0.06
+
+# How strongly latent ship scale drives both baseline categories and baseline revenue.
+# Higher values → more confounding → larger gap between OLS and FE estimates.
+scale_confounding_strength: 0.35
+
+# --- Treatment assignment ---
+frac_ships_with_category_event: 0.18   # ~18% of ships receive a refit
+event_month_min: 12                     # earliest refit (months from panel start)
+event_month_max: 36                     # latest refit
+
+# --- Cabin category bounds ---
+min_categories: 3
+max_categories: 16
