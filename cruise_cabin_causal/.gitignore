@@ -1,0 +1,12 @@
+data/raw/
+outputs/
+data/processed/*.csv
+.env
+__pycache__/
+*.pyc
+.DS_Store
+.ipynb_checkpoints/
+.jupyter/
+*.egg-info/
+dist/
+build/
