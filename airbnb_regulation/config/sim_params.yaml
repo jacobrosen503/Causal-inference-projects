@@ -1,0 +1,79 @@
+# Airbnb Regulation Causal Study — synthetic panel parameters
+# Calibrated to publicly reported figures (NYC LL18 news coverage, academic STR literature).
+# Real data download: run scripts/download_inside_airbnb.py in Cursor.
+
+seed: 42
+start_month: "2021-01-01"
+n_months: 48   # 2021-01 through 2024-12
+
+cities:
+  - name: New York City
+    country: USA
+    baseline_listings: 22000      # pre-LL18 peak (widely reported)
+    baseline_price_usd: 185.0
+    baseline_availability: 0.52
+    baseline_entire_home_share: 0.72
+    treat_month: 2023-09-01       # LL18 enforcement date
+    treat_col: treat_nyc
+
+  - name: Florence
+    country: Italy
+    baseline_listings: 9800       # approx; historic centre + surroundings
+    baseline_price_usd: 145.0
+    baseline_availability: 0.48
+    baseline_entire_home_share: 0.68
+    treat_month: 2023-10-01       # historic centre ban
+    treat_col: treat_florence
+
+  - name: Amsterdam
+    country: Netherlands
+    baseline_listings: 12500
+    baseline_price_usd: 165.0
+    baseline_availability: 0.44
+    baseline_entire_home_share: 0.61
+    treat_month: null             # pre-panel cap; used as control
+    treat_col: null
+
+  - name: Lisbon
+    country: Portugal
+    baseline_listings: 19000
+    baseline_price_usd: 125.0
+    baseline_availability: 0.55
+    baseline_entire_home_share: 0.70
+    treat_month: null
+    treat_col: null
+
+  - name: Vienna
+    country: Austria
+    baseline_listings: 8200
+    baseline_price_usd: 110.0
+    baseline_availability: 0.50
+    baseline_entire_home_share: 0.58
+    treat_month: null
+    treat_col: null
+
+  - name: Barcelona
+    country: Spain
+    baseline_listings: 17000
+    baseline_price_usd: 140.0
+    baseline_availability: 0.51
+    baseline_entire_home_share: 0.74
+    treat_month: null             # moratorium announced but not enforced in window
+    treat_col: null
+
+# Treatment effects (on log scale unless noted)
+effects:
+  nyc_log_listings: -1.65        # ~80% drop; log(0.20) ≈ -1.61
+  nyc_log_price: 0.08            # ~8% price increase (supply shock)
+  nyc_availability: -0.12        # fewer listings, lower platform availability
+  nyc_entire_home_share: -0.28   # registered hosts skew toward private room
+
+  florence_log_listings: -0.51   # ~40% drop in active listings
+  florence_log_price: 0.04
+  florence_availability: -0.06
+  florence_entire_home_share: -0.15
+
+# Noise
+listing_noise_sd: 0.04
+price_noise_sd: 8.0
+seasonality_amplitude: 0.18     # tourism seasonality (summer peak)
