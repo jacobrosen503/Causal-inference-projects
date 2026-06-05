@@ -1,0 +1,8 @@
+city,country,policy,enforcement_date,treat_col,notes
+New York City,USA,Local Law 18 — short-term rental registration,2023-09-01,treat_nyc,"Registration required; unregistered listings removed. Listings fell from ~22000 to ~4000 almost immediately."
+Florence,Italy,Historic centre STR ban,2023-10-01,treat_florence,"Ban on new STR permits in historic centre (UNESCO zone). Existing permits allowed to expire."
+Barcelona,Spain,Tourist licence moratorium,2028-11-01,treat_barcelona,"Moratorium announced 2023; enforcement phased. Coded as not-yet-treated in panel window."
+London,UK,90-night annual cap (enforcement),2017-01-01,treat_london,"Airbnb self-enforces 90-night cap. Pre-dates panel; London used as control with cap already in place."
+Amsterdam,Netherlands,30-night cap + registration,2019-01-01,treat_amsterdam,"Cap tightened over time; pre-dates panel. Used as control."
+Lisbon,Portugal,No major new regulation in window,2099-01-01,treat_lisbon,"Moratoriums discussed but not enacted during 2021-2024 window. Clean control."
+Vienna,Austria,No major new regulation in window,2099-01-01,treat_vienna,"Permit system exists but no major shock in window. Clean control."
