@@ -1,17 +1,19 @@
-"""Download EPA AQS daily PM2.5 monitor data for western US states.
+"""Download EPA AQS annual summary PM2.5 data for western US states.
 
-Source: EPA Air Quality System (AQS) API
-API docs: https://aqs.epa.gov/aqsweb/documents/data_api.html
-Sign up for free API key: https://aqs.epa.gov/data/api/signup?email=YOUR_EMAIL
+Uses the EPA AQS API "annualData" endpoint which returns one record
+per monitor per year — already aggregated. Much smaller than daily files.
+
+Total download: ~20-30MB for all 11 states × 10 years.
+Compare to daily files: ~400MB+
 
 Usage:
-    python scripts/download_epa_aqs.py --email your@email.com --key YOUR_KEY
-    python scripts/download_epa_aqs.py --email your@email.com --key YOUR_KEY --years 2015 2016
+    python scripts/download_epa_aqs.py --email YOUR@EMAIL --key bluekit86
+    python scripts/download_epa_aqs.py --email YOUR@EMAIL --key bluekit86 --years 2015 2016
 
-Output: data/raw/epa_aqs/pm25_daily_{state}_{year}.csv
+Output: data/raw/epa_aqs/pm25_annual_{state}_{year}.csv
 
 After downloading:
-    python src/ingest/epa_aqs.py  (builds district-year PM2.5 panel)
+    python src/ingest/epa_aqs.py
 """
 from __future__ import annotations
 
@@ -23,32 +25,30 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = PROJECT_ROOT / "data" / "raw" / "epa_aqs"
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-# Western US state FIPS codes
+# Western US: state FIPS codes
 STATES = {
     "CA": "06", "OR": "41", "WA": "53", "MT": "30",
     "ID": "16", "WY": "56", "CO": "08", "NV": "32",
     "AZ": "04", "NM": "35", "UT": "49",
 }
 
-BASE_URL = "https://aqs.epa.gov/data/api"
+PM25_PARAM = "88101"   # PM2.5 FRM/FEM Mass
+BASE_URL   = "https://aqs.epa.gov/data/api"
 
 
-def download_state_year(state_fips: str, state_abbr: str, year: int, email: str, key: str) -> bool:
-    try:
-        import requests
-    except ImportError:
-        print("requests not installed: pip install requests")
-        return False
+def download_annual(state_abbr: str, state_fips: str, year: int,
+                    email: str, key: str) -> bool:
+    import requests, json
 
-    out = RAW_DIR / f"pm25_daily_{state_abbr}_{year}.csv"
+    out = RAW_DIR / f"pm25_annual_{state_abbr}_{year}.csv"
     if out.exists():
         print(f"    [skip] {out.name}")
         return True
 
     url = (
-        f"{BASE_URL}/dailyData/byState"
+        f"{BASE_URL}/annualData/byState"
         f"?email={email}&key={key}"
-        f"&param=88101"
+        f"&param={PM25_PARAM}"
         f"&bdate={year}0101&edate={year}1231"
         f"&state={state_fips}"
     )
@@ -57,16 +57,29 @@ def download_state_year(state_fips: str, state_abbr: str, year: int, email: str,
         r = requests.get(url, timeout=60)
         r.raise_for_status()
         data = r.json()
-        if data.get("Header", [{}])[0].get("status") == "No data matched your selection":
+
+        header = data.get("Header", [{}])[0]
+        if header.get("status") == "No data matched your selection":
             print(f"    [no data] {state_abbr} {year}")
+            out.write_text("")   # empty file so we skip next time
             return True
+
         rows = data.get("Data", [])
         if not rows:
+            print(f"    [empty] {state_abbr} {year}")
             return True
+
         import csv, io
-        out.write_text("\n".join([",".join(rows[0].keys())] + [",".join(str(v) for v in r.values()) for r in rows]))
-        print(f"    [ok] {out.name}  ({len(rows)} records)")
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=rows[0].keys())
+        writer.writeheader()
+        writer.writerows(rows)
+        out.write_text(buf.getvalue())
+
+        size_kb = out.stat().st_size / 1024
+        print(f"    [ok] {out.name}  ({len(rows)} monitors, {size_kb:.0f} KB)")
         return True
+
     except Exception as e:
         print(f"    [fail] {state_abbr} {year}: {e}")
         return False
@@ -74,24 +87,29 @@ def download_state_year(state_fips: str, state_abbr: str, year: int, email: str,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--email", required=True, help="EPA AQS registered email")
-    parser.add_argument("--key",   required=True, help="EPA AQS API key")
+    parser.add_argument("--email", required=True)
+    parser.add_argument("--key",   required=True)
     parser.add_argument("--years", nargs="+", type=int,
-                        default=list(range(2010, 2020)),
-                        help="Years to download (default: 2010-2019)")
+                        default=list(range(2010, 2020)))
+    parser.add_argument("--states", nargs="+",
+                        default=list(STATES.keys()),
+                        choices=list(STATES.keys()))
     args = parser.parse_args()
 
     total = ok = 0
-    for state_abbr, state_fips in STATES.items():
+    for state_abbr in args.states:
+        state_fips = STATES[state_abbr]
         print(f"\n{state_abbr}")
         for year in args.years:
             total += 1
-            if download_state_year(state_fips, state_abbr, year, args.email, args.key):
+            if download_annual(state_abbr, state_fips, year,
+                               args.email, args.key):
                 ok += 1
-            time.sleep(0.5)
+            time.sleep(0.5)   # be polite to EPA API
 
-    print(f"\nDownloaded {ok}/{total}")
-    print("Next: python src/ingest/epa_aqs.py")
+    print(f"\nDownloaded {ok}/{total} state-year files")
+    print(f"Output directory: {RAW_DIR}")
+    print(f"Next step: python src/ingest/epa_aqs.py")
 
 
 if __name__ == "__main__":
