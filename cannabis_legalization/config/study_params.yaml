@@ -1,0 +1,44 @@
+# Cannabis Legalization Causal Study — analysis parameters
+
+# Panel window
+panel_start_year: 2010
+panel_end_year: 2022
+
+# Treatment definition
+# Use retail_sales_year as treatment year (when legal sales began, not when law passed)
+# States with retail_sales_year > panel_end_year are treated as never-treated in main spec
+treatment_col: retail_sales_year
+
+# Event study window
+event_window_pre:  -5   # years before legalization
+event_window_post:  5   # years after legalization
+
+# States to exclude from all specs
+# DC: no retail sales (possession only)
+# HI: remote market; different dynamics
+exclude_states: ["District of Columbia", "Hawaii", "Washington DC"]
+
+# Primary outcomes (FARS)
+fars_outcomes:
+  - total_fatalities_per_100k
+  - alcohol_impaired_fatalities_per_100k
+  - drug_impaired_fatalities_per_100k
+
+# Secondary outcomes (CDC WONDER)
+cdc_outcomes:
+  - overdose_deaths_per_100k
+  - opioid_deaths_per_100k
+
+# NYC dispensary analysis
+nyc_311_start: "2020-01-01"
+nyc_311_end:   "2024-12-31"
+nyc_event_window_months: 12   # months pre/post dispensary opening
+
+# Complaint types of interest in NYC 311
+nyc_complaint_types:
+  - "Drug Activity"
+  - "Noise - Residential"
+  - "Noise - Street/Sidewalk"
+  - "Illegal Parking"
+  - "Blocked Driveway"
+  - "Disorderly Youth"
