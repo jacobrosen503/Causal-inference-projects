@@ -1,13 +1,12 @@
-"""Build county-year PM2.5 panel from EPA AQS daily monitor data.
+"""Build district-year PM2.5 panel from EPA AQS daily monitor data.
 
-Aggregates daily monitor readings to annual county-level averages.
-County is the geographic unit because:
-  - EPA regulates PM2.5 at the county/air basin level
-  - Avoids complex IDW spatial join to district centroids
-  - County FIPS links cleanly to SEDA via CCD crosswalk
+Uses inverse-distance weighting (IDW) from EPA monitor locations to
+district centroids (from NCES EDGE geocode file). Districts within
+100km of at least one monitor get a weighted average PM2.5 estimate.
 
 Input:  data/raw/epa_aqs/pm25_daily_{state}_{year}.csv
-Output: data/processed/pm25_county_year.parquet
+        data/crosswalks/district_centroids_edge.csv
+Output: data/processed/pm25_district_year.parquet
 
 Usage:
     python src/ingest/epa_aqs.py
@@ -18,13 +17,22 @@ import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RAW_DIR  = PROJECT_ROOT / "data" / "raw" / "epa_aqs"
-OUT_DIR  = PROJECT_ROOT / "data" / "processed"
+RAW_DIR   = PROJECT_ROOT / "data" / "raw" / "epa_aqs"
+XWALK     = PROJECT_ROOT / "data" / "crosswalks" / "district_centroids_edge.csv"
+OUT_DIR   = PROJECT_ROOT / "data" / "processed"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-WESTERN_STATE_FIPS = {
-    "06","41","53","30","16","56","08","32","04","35","49"
-}
+MAX_DIST_KM = 100   # max monitor-to-district distance for IDW
+
+
+def haversine_km(lat1, lon1, lat2, lon2):
+    """Vectorized haversine distance in km."""
+    R = 6371.0
+    dlat = np.radians(lat2 - lat1)
+    dlon = np.radians(lon2 - lon1)
+    a = (np.sin(dlat/2)**2
+         + np.cos(np.radians(lat1)) * np.cos(np.radians(lat2)) * np.sin(dlon/2)**2)
+    return R * 2 * np.arcsin(np.sqrt(a))
 
 
 def load_all_aqs() -> pd.DataFrame:
@@ -38,90 +46,99 @@ def load_all_aqs() -> pd.DataFrame:
     dfs = []
     for f in files:
         try:
-            df = pd.read_csv(f, low_memory=False)
-            dfs.append(df)
+            dfs.append(pd.read_csv(f, low_memory=False))
         except Exception as e:
             print(f"  Warning: {f.name} — {e}")
     combined = pd.concat(dfs, ignore_index=True)
-    print(f"  Combined: {len(combined):,} rows")
+    print(f"  Combined: {len(combined):,} monitor-days")
     return combined
 
 
-def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize AQS column names which vary slightly by API version."""
-    df.columns = [c.lower().strip().replace(" ", "_") for c in df.columns]
-    rename = {
-        "arithmetic_mean":        "pm25",
-        "daily_mean_pm2.5_concentration": "pm25",
-        "sample_measurement":     "pm25",
-        "state_code":             "state_fips",
-        "county_code":            "county_fips_3digit",
-        "date_local":             "date",
-        "local_site_name":        "site_name",
-    }
-    return df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
+def aggregate_monitors(aqs: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate daily monitor readings to annual monitor-level means."""
+    aqs.columns = [c.lower().strip().replace(" ","_") for c in aqs.columns]
 
+    # Find key columns
+    date_col = next((c for c in aqs.columns if "date" in c), None)
+    pm_col   = next((c for c in aqs.columns if "arithmetic_mean" in c or "daily_mean" in c), None)
+    lat_col  = "latitude"
+    lon_col  = "longitude"
 
-def build_county_year_panel(df: pd.DataFrame) -> pd.DataFrame:
-    df = normalize_columns(df)
+    if not all(c in aqs.columns for c in [lat_col, lon_col]):
+        raise KeyError(f"lat/lon columns missing. Available: {list(aqs.columns[:15])}")
 
-    # Parse date and extract year
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["year"] = df["date"].dt.year
+    aqs["year"] = pd.to_datetime(aqs[date_col], errors="coerce").dt.year
+    aqs[pm_col] = pd.to_numeric(aqs[pm_col], errors="coerce")
+    aqs = aqs[aqs[pm_col].between(0, 500)]
 
-    # Build 5-digit county FIPS
-    if "state_fips" in df.columns and "county_fips_3digit" in df.columns:
-        df["county_fips"] = (
-            df["state_fips"].astype(str).str.zfill(2) +
-            df["county_fips_3digit"].astype(str).str.zfill(3)
-        )
-    elif "county_code" in df.columns and "state_code" in df.columns:
-        df["county_fips"] = (
-            df["state_code"].astype(str).str.zfill(2) +
-            df["county_code"].astype(str).str.zfill(3)
-        )
-    else:
-        raise KeyError(f"Cannot build county FIPS. Columns: {list(df.columns[:15])}")
-
-    # Filter to western states
-    df = df[df["county_fips"].str[:2].isin(WESTERN_STATE_FIPS)]
-
-    # Clean PM2.5 values
-    if "pm25" not in df.columns:
-        pm_col = next((c for c in df.columns if "mean" in c or "pm" in c.lower()), None)
-        if pm_col:
-            df = df.rename(columns={pm_col: "pm25"})
-        else:
-            raise KeyError(f"Cannot find PM2.5 column. Available: {list(df.columns)}")
-
-    df["pm25"] = pd.to_numeric(df["pm25"], errors="coerce")
-    df = df[df["pm25"].between(0, 500)]   # drop impossible values
-
-    # Aggregate to county x year
-    panel = (
-        df.groupby(["county_fips", "year"])
-        .agg(
-            pm25_annual_mean   =("pm25", "mean"),
-            pm25_annual_median =("pm25", "median"),
-            pm25_days_gt35     =("pm25", lambda x: (x > 35).sum()),   # unhealthy days
-            n_monitor_days     =("pm25", "count"),
-            n_monitors         =("county_fips", "count"),
-        )
+    monitor_annual = (
+        aqs.groupby([lat_col, lon_col, "year"])
+        .agg(pm25_mean=(pm_col, "mean"), n_days=(pm_col, "count"))
         .reset_index()
     )
+    print(f"  Annual monitor records: {len(monitor_annual):,}")
+    return monitor_annual
+
+
+def idw_to_districts(monitors: pd.DataFrame, districts: pd.DataFrame) -> pd.DataFrame:
+    """IDW from monitors to district centroids, within MAX_DIST_KM."""
+    results = []
+    years = sorted(monitors["year"].dropna().unique())
+
+    for year in years:
+        yr_monitors = monitors[monitors["year"] == year].dropna(
+            subset=["latitude","longitude","pm25_mean"]
+        )
+        if yr_monitors.empty:
+            continue
+
+        mon_lats = yr_monitors["latitude"].values
+        mon_lons = yr_monitors["longitude"].values
+        mon_pm   = yr_monitors["pm25_mean"].values
+
+        for _, dist in districts.iterrows():
+            dists_km = haversine_km(dist["lat"], dist["lon"], mon_lats, mon_lons)
+            nearby = dists_km <= MAX_DIST_KM
+
+            if not nearby.any():
+                continue
+
+            d = dists_km[nearby]
+            pm = mon_pm[nearby]
+            w  = 1 / (d**2 + 1e-6)
+            pm25_idw = (pm * w).sum() / w.sum()
+
+            results.append({
+                "leaid":           dist["leaid"],
+                "year":            int(year),
+                "pm25_annual_mean": round(pm25_idw, 3),
+                "n_monitors":       int(nearby.sum()),
+            })
+
+    panel = pd.DataFrame(results)
     panel["log_pm25"] = np.log(panel["pm25_annual_mean"].clip(lower=0.1))
+    print(f"District-year PM2.5 panel: {panel.shape}")
+    print(f"  Districts with coverage: {panel['leaid'].nunique():,}")
+    print(f"  PM2.5 range: {panel['pm25_annual_mean'].min():.1f}-{panel['pm25_annual_mean'].max():.1f} μg/m³")
+    return panel
 
-    print(f"County-year PM2.5 panel: {panel.shape}")
-    print(f"  Counties: {panel['county_fips'].nunique():,}")
-    print(f"  Years: {sorted(panel['year'].unique())}")
-    print(f"  PM2.5 range: {panel['pm25_annual_mean'].min():.1f} - {panel['pm25_annual_mean'].max():.1f} μg/m³")
 
-    out = OUT_DIR / "pm25_county_year.parquet"
+def build_panel() -> pd.DataFrame:
+    aqs       = load_all_aqs()
+    monitors  = aggregate_monitors(aqs)
+    districts = pd.read_csv(XWALK)
+    districts["leaid"] = districts["leaid"].astype(str).str.zfill(7)
+
+    print(f"\nRunning IDW for {districts.shape[0]:,} districts × {monitors['year'].nunique()} years...")
+    print("(This may take 10-20 minutes depending on hardware)")
+
+    panel = idw_to_districts(monitors, districts)
+
+    out = OUT_DIR / "pm25_district_year.parquet"
     panel.to_parquet(out, index=False)
     print(f"Written: {out}")
     return panel
 
 
 if __name__ == "__main__":
-    df = load_all_aqs()
-    build_county_year_panel(df)
+    build_panel()
