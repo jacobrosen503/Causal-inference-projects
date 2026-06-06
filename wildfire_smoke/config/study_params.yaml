@@ -1,0 +1,47 @@
+# Wildfire Smoke & Student Achievement — study parameters
+
+# Panel window
+panel_start_year: 2010
+panel_end_year:   2019   # stop before COVID (2020 disrupted testing)
+
+# Geography
+states:           # western US where wildfire exposure is highest
+  - CA
+  - OR
+  - WA
+  - MT
+  - ID
+  - WY
+  - CO
+  - NV
+  - AZ
+  - NM
+  - UT
+
+# EPA AQS
+epa_param_code: "88101"      # PM2.5 FRM/FEM Mass (primary instrument)
+epa_param_code_alt: "88502"  # PM2.5 non-FRM/FEM (backup)
+epa_aqi_cutoffs: [100, 150]  # RDD running variable thresholds
+
+# NOAA HMS smoke
+hms_smoke_threshold: "Medium"  # Light / Medium / Heavy
+
+# Instrument construction
+smoke_instrument_metric: "smoke_days"   # days with HMS smoke plume over district centroid
+wind_buffer_km: 50                      # radius for wind-direction instrument
+
+# SEDA
+seda_grade_pool: ["gr3", "gr4", "gr5", "gr6", "gr7", "gr8"]  # grades with reliable data
+seda_subject: "math"    # math scores more reliable than reading
+
+# Event study
+camp_fire_year: 2018    # Camp Fire (Paradise, CA) — major shock for case study
+camp_fire_county_fips: "06007"  # Butte County CA
+
+# RDD
+rdd_bandwidth_default: 20   # AQI units around threshold
+rdd_polynomial_order: 1     # linear on each side
+
+# DML
+dml_n_splits: 5
+dml_n_estimators: 200
