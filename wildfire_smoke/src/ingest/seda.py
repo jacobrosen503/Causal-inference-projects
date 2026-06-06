@@ -1,78 +1,76 @@
-"""Load and clean Stanford SEDA district test score data.
+"""Load and clean Stanford SEDA 4.1 district test score data.
 
 Input:  data/raw/seda/seda_district_long.csv
+        (file: seda_geodist_long_cs_4.1.csv, renamed on save)
 Output: data/processed/seda_district_year.parquet
+
+Columns in SEDA 4.1 scores file:
+    fips, stateabb, sedalea, sedaleaname, subject, grade, year,
+    cs_mn_all, cs_mnse_all, totgyb_all, [subgroup columns...]
 
 Usage:
     python src/ingest/seda.py
 """
 from __future__ import annotations
-
 from pathlib import Path
 import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RAW_SEDA = PROJECT_ROOT / "data" / "raw" / "seda" / "seda_district_long.csv"
+RAW_FILE = PROJECT_ROOT / "data" / "raw" / "seda" / "seda_district_long.csv"
 OUT_DIR  = PROJECT_ROOT / "data" / "processed"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# Western US states
+WESTERN = ["CA","OR","WA","MT","ID","WY","CO","NV","AZ","NM","UT"]
+
+# Study window (stop before COVID)
+YEAR_MIN, YEAR_MAX = 2010, 2019
+
 
 def load_seda() -> pd.DataFrame:
-    if not RAW_SEDA.exists():
+    if not RAW_FILE.exists():
         raise FileNotFoundError(
-            f"{RAW_SEDA} not found.\n"
-            "Download from https://edopportunity.org/get-the-data/seda-archive-downloads/\n"
-            "Then run: python scripts/download_seda.py  (for instructions)"
+            f"{RAW_FILE} not found.\n"
+            "Save seda_geodist_long_cs_4.1.csv as:\n"
+            "  data/raw/seda/seda_district_long.csv"
         )
-
-    print(f"Loading SEDA: {RAW_SEDA}")
-    df = pd.read_csv(RAW_SEDA, low_memory=False)
-    df.columns = [c.lower().strip() for c in df.columns]
-    print(f"  Raw shape: {df.shape}")
+    print(f"Loading SEDA: {RAW_FILE}")
+    # Large file — load in chunks if needed
+    df = pd.read_csv(RAW_FILE, low_memory=False)
+    df.columns = [c.strip() for c in df.columns]
+    print(f"  Raw: {df.shape}")
     return df
 
 
 def build_panel(df: pd.DataFrame) -> pd.DataFrame:
-    # Normalize common column name variants across SEDA versions
-    rename = {
-        "sedalea":    "leaid",
-        "lea_id":     "leaid",
-        "stateabb":   "state",
-        "mn_avg_ol":  "test_score_mean",
-        "cs_mn_avg_ol": "test_score_mean",
-        "mn_avg_ol_se": "test_score_se",
-    }
-    df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
+    # Filter: math only, western states, study window, grades 3-8
+    df = df[df["subject"] == "mth"].copy()
+    df = df[df["stateabb"].isin(WESTERN)]
+    df = df[df["year"].between(YEAR_MIN, YEAR_MAX)]
+    df = df[df["grade"].between(3, 8)]
+    print(f"  After filters (math, western, {YEAR_MIN}-{YEAR_MAX}, gr3-8): {df.shape}")
 
-    # Filter: math scores, grades 3-8, western states
-    WESTERN = ["CA", "OR", "WA", "MT", "ID", "WY", "CO", "NV", "AZ", "NM", "UT"]
-    if "subject" in df.columns:
-        df = df[df["subject"] == "math"]
-    if "state" in df.columns:
-        df = df[df["state"].isin(WESTERN)]
-    if "grade" in df.columns:
-        df = df[df["grade"].between(3, 8)]
-
-    # Pool grades: average test score across grades per district-year
-    group_cols = ["leaid", "year"]
-    if "state" in df.columns:
-        group_cols.append("state")
-
+    # Pool grades: average cs_mn_all across grades per district-year
     panel = (
-        df.groupby(group_cols)
+        df.groupby(["sedalea", "stateabb", "year"])
         .agg(
-            test_score_mean=("test_score_mean", "mean"),
-            test_score_se=("test_score_se", "mean") if "test_score_se" in df.columns else ("test_score_mean", "std"),
-            n_grades=("test_score_mean", "count"),
+            test_score_mean=("cs_mn_all",  "mean"),
+            test_score_se  =("cs_mnse_all","mean"),
+            n_grades       =("grade",      "count"),
+            n_students     =("totgyb_all", "sum"),
         )
         .reset_index()
     )
 
-    panel["year"] = pd.to_numeric(panel["year"], errors="coerce").astype("Int64")
-    panel = panel.dropna(subset=["leaid", "year", "test_score_mean"])
+    panel = panel.rename(columns={"sedalea": "leaid", "stateabb": "state"})
+    panel["leaid"] = panel["leaid"].astype(str).str.strip()
+    panel["year"]  = panel["year"].astype(int)
 
-    print(f"SEDA panel: {panel.shape} | districts: {panel['leaid'].nunique()} | years: {sorted(panel['year'].dropna().unique())}")
+    panel = panel.dropna(subset=["test_score_mean"])
+    panel = panel.sort_values(["leaid","year"]).reset_index(drop=True)
+
+    print(f"  Panel: {panel.shape} | Districts: {panel['leaid'].nunique():,} | Years: {sorted(panel['year'].unique())}")
 
     out = OUT_DIR / "seda_district_year.parquet"
     panel.to_parquet(out, index=False)
