@@ -1,0 +1,54 @@
+state,state_abbr,fips,law_passed_year,retail_sales_year,law_name,notes
+Colorado,CO,08,2012,2014,Amendment 64,First state with legal retail sales
+Washington,WA,53,2012,2014,Initiative 502,
+Oregon,OR,41,2014,2015,Measure 91,Medical dispensaries could sell recreational from Oct 2015; full retail 2016
+Alaska,AK,02,2014,2016,Measure 2,Remote geography slowed rollout
+District of Columbia,DC,11,2014,,Initiative 71,Retail sales blocked by Congress; possession only
+California,CA,06,2016,2018,Proposition 64,Largest market; delayed rollout
+Nevada,NV,32,2016,2017,Question 2,Fast rollout; tourism market
+Massachusetts,MA,25,2016,2018,Question 4,Delayed by local opt-outs
+Maine,ME,23,2016,2020,Question 1,Significantly delayed; regulatory disputes
+Vermont,VT,50,2018,2022,S.54 / H.164,Possession/home grow 2018; retail much later
+Michigan,MI,26,2018,2019,Proposal 1,
+Illinois,IL,17,2019,2020,HB 1438,Social equity focus
+Arizona,AZ,04,2020,2021,Proposition 207,
+Montana,MT,30,2020,2022,Initiative 190,
+New Jersey,NJ,34,2020,2022,Question 1,
+New Mexico,NM,35,2021,2021,HB 2,Fast implementation
+Virginia,VA,51,2021,2024,HB 2312,Possession 2021; retail delayed to 2024
+Connecticut,CT,09,2021,2022,SB 1201,
+Rhode Island,RI,44,2022,2022,H 7593,
+Maryland,MD,24,2022,2023,Question 4,
+Missouri,MO,29,2022,2023,Amendment 3,
+Delaware,DE,10,2023,,HB 1,Possession only as of 2023; no retail yet
+Minnesota,MN,27,2023,2025,HF 100,Outside main study window
+Ohio,OH,39,2023,2024,Issue 2,Outside main study window
+South Dakota,SD,46,2022,2023,Measure 27,Earlier 2020 passage struck down by courts
+Alabama,AL,01,,,,"Never treated (control)"
+Arkansas,AR,05,,,,"Never treated (control)"
+Florida,FL,12,,,,"Never treated (control); medical only"
+Georgia,GA,13,,,,"Never treated (control)"
+Idaho,ID,16,,,,"Never treated (control)"
+Indiana,IN,18,,,,"Never treated (control)"
+Iowa,IA,19,,,,"Never treated (control)"
+Kansas,KS,20,,,,"Never treated (control)"
+Kentucky,KY,21,,,,"Never treated (control)"
+Louisiana,LA,22,,,,"Never treated (control)"
+Mississippi,MS,28,,,,"Never treated (control)"
+Nebraska,NE,31,,,,"Never treated (control)"
+North Carolina,NC,37,,,,"Never treated (control)"
+North Dakota,ND,38,,,,"Never treated (control)"
+Oklahoma,OK,40,,,,"Never treated (control); medical only"
+Pennsylvania,PA,42,,,,"Never treated (control); medical only"
+South Carolina,SC,45,,,,"Never treated (control)"
+Tennessee,TN,47,,,,"Never treated (control)"
+Texas,TX,48,,,,"Never treated (control)"
+Utah,UT,49,,,,"Never treated (control)"
+West Virginia,WV,54,,,,"Never treated (control)"
+Wisconsin,WI,55,,,,"Never treated (control)"
+Wyoming,WY,56,,,,"Never treated (control)"
+Hawaii,HI,15,,,,"Never treated — medical only; remote; excluded from most specs"
+New Hampshire,NH,33,,,,"Never treated (control)"
+New York,NY,36,2021,2022,"MRTA","First dispensary Dec 2022; very limited rollout in study window"
+North Carolina,NC,37,,,,"Never treated (control)"
+Washington DC,DC,11,2014,,Initiative 71,"No retail; possession only"
