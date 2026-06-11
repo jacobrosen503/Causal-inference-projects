@@ -1,10 +1,10 @@
-"""Build district-year PM2.5 panel from EPA AQS daily monitor data.
+"""Build district-year PM2.5 panel from EPA AQS annual summary data.
 
-Aggregates daily monitor readings to annual district-level averages using
+Aggregates annual monitor readings to district-level averages using
 inverse-distance weighting from monitor locations to district centroids.
 
-Input:  data/raw/epa_aqs/pm25_daily_{state}_{year}.csv
-        data/crosswalks/district_centroids.csv
+Input:  data/raw/epa_aqs/pm25_annual_{state}_{year}.csv
+        data/crosswalks/district_crosswalk.csv
 Output: data/processed/pm25_district_year.parquet
 
 Usage:
@@ -12,7 +12,6 @@ Usage:
 """
 from __future__ import annotations
 
-import glob
 from pathlib import Path
 
 import numpy as np
@@ -20,13 +19,15 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RAW_DIR  = PROJECT_ROOT / "data" / "raw" / "epa_aqs"
-XWALK    = PROJECT_ROOT / "data" / "crosswalks" / "district_centroids.csv"
+# district_crosswalk.csv has columns: leaid, lat, lon (built by build_crosswalks.py)
+XWALK    = PROJECT_ROOT / "data" / "crosswalks" / "district_crosswalk.csv"
 OUT_DIR  = PROJECT_ROOT / "data" / "processed"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def load_all_aqs() -> pd.DataFrame:
-    files = sorted(RAW_DIR.glob("pm25_daily_*.csv"))
+    # Support both annual summary files (pm25_annual_*) and daily files (pm25_daily_*)
+    files = sorted(RAW_DIR.glob("pm25_annual_*.csv")) or sorted(RAW_DIR.glob("pm25_daily_*.csv"))
     if not files:
         raise FileNotFoundError(
             f"No AQS files found in {RAW_DIR}. "
@@ -51,19 +52,28 @@ def aggregate_to_district_year(aqs: pd.DataFrame, centroids: pd.DataFrame) -> pd
     # Normalize AQS columns
     aqs.columns = [c.lower().strip().replace(" ", "_") for c in aqs.columns]
 
-    # Key columns: latitude, longitude, arithmetic_mean (daily PM2.5), date_local
-    date_col = next((c for c in aqs.columns if "date" in c), None)
-    pm_col   = next((c for c in aqs.columns if "arithmetic_mean" in c or "daily_mean" in c), None)
-    lat_col  = next((c for c in aqs.columns if c == "latitude"), None)
-    lon_col  = next((c for c in aqs.columns if c == "longitude"), None)
+    pm_col  = next((c for c in aqs.columns if "arithmetic_mean" in c or "daily_mean" in c), None)
+    lat_col = next((c for c in aqs.columns if c == "latitude"), None)
+    lon_col = next((c for c in aqs.columns if c == "longitude"), None)
 
-    if not all([date_col, pm_col, lat_col, lon_col]):
+    if not all([pm_col, lat_col, lon_col]):
         raise KeyError(f"Missing expected columns. Found: {list(aqs.columns[:10])}")
 
-    aqs["year"] = pd.to_datetime(aqs[date_col], errors="coerce").dt.year
-    aqs[pm_col] = pd.to_numeric(aqs[pm_col], errors="coerce")
+    # Use 'year' column if present (annual files), else parse from date column
+    if "year" not in aqs.columns:
+        date_col = next((c for c in aqs.columns if "date" in c), None)
+        if date_col:
+            aqs["year"] = pd.to_datetime(aqs[date_col], errors="coerce").dt.year
+        else:
+            raise KeyError("Cannot determine year from AQS data")
 
-    # Annual monitor averages
+    aqs[pm_col] = pd.to_numeric(aqs[pm_col], errors="coerce")
+    # For annual files, filter to the 24-hour daily mean standard (one row per monitor-year)
+    if "pollutant_standard" in aqs.columns:
+        mask = aqs["pollutant_standard"].str.contains("24-hour|24 hour|Annual", case=False, na=False)
+        aqs = aqs[mask].drop_duplicates(subset=[lat_col, lon_col, "year"])
+
+    # Annual monitor averages (for annual files this is a no-op groupby)
     monitor_annual = (
         aqs.groupby([lat_col, lon_col, "year"])
         .agg(pm25_mean=(pm_col, "mean"), pm25_days=(pm_col, "count"))
@@ -72,11 +82,13 @@ def aggregate_to_district_year(aqs: pd.DataFrame, centroids: pd.DataFrame) -> pd
 
     if not XWALK.exists():
         raise FileNotFoundError(
-            f"District centroids not found at {XWALK}. "
+            f"District crosswalk not found at {XWALK}. "
             "Run: python src/merge/build_crosswalks.py"
         )
 
     districts = pd.read_csv(XWALK)
+    # Keep only rows with valid lat/lon
+    districts = districts.dropna(subset=["lat", "lon"])
 
     # For each district x year, find monitors within 100km and IDW-average
     results = []

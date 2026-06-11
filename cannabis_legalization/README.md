@@ -37,7 +37,13 @@ python src/build_311_panel.py                    # builds nyc_311_zip_month.parq
 
 ```
 data/codebooks/state_legalization_dates.csv   # retail sales start years by state
+data/processed/fars_state_year.parquet        # NHTSA FARS 2010-2022 (real data)
 ```
+
+**Note on data availability:**
+- NHTSA FARS (traffic fatalities): real data, committed to repo
+- CDC WONDER (opioid overdoses, notebook 09): real data, 2010–2017, 51 states. Downloaded from CDC WONDER "Underlying Cause of Death" (drug overdose ICD codes). Committed to repo.
+- NYC 311 + dispensary events (notebook 07): real data. 4.6M 311 service requests (2020–2025, filtered to cannabis-relevant complaint types) from NYC Open Data Socrata API; 51 NYC dispensary opening dates from NY Office of Cannabis Management retail license records. Panel covers Jan 2022–Jun 2025 (235 zip codes × 42 months).
 
 ---
 
@@ -86,4 +92,4 @@ pandas, numpy, pyarrow, statsmodels, linearmodels, econml, matplotlib, seaborn
 
 ## Related
 
-Part of a three-project causal inference portfolio. See the [repo root](../) for the full index.
+Part of a four-project causal inference portfolio. See the [repo root](../) for the full index.

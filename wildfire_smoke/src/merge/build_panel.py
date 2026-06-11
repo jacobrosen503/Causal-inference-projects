@@ -46,6 +46,10 @@ def build_panel() -> pd.DataFrame:
     print(f"PM2.5: {pm25.shape}")
     print(f"Smoke: {smoke.shape}")
 
+    # Normalize leaid to zero-padded string across all sources
+    for df in [seda, pm25, smoke]:
+        df["leaid"] = df["leaid"].astype(str).str.strip().str.zfill(7)
+
     # Merge on district x year
     panel = (
         seda

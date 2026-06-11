@@ -3,31 +3,56 @@
 For each district x year, computes:
   - smoke_days: number of days with a Medium+ HMS smoke plume over district centroid
   - smoke_days_heavy: days with Heavy smoke only
-  - upwind_smoke_days: days with smoke AND wind blowing from fire-prone direction
+  - smoke_days_medium: days with Medium smoke only
 
-The upwind smoke instrument is the key IV: it captures smoke from distant wildfires
+The smoke_days instrument is the key IV: it captures smoke from distant wildfires
 that blows into a district, as distinct from local industrial/traffic PM2.5.
 
 Input:  data/raw/hms_smoke/{year}/  (HMS shapefiles)
-        data/crosswalks/district_centroids.csv
+        data/crosswalks/district_crosswalk.csv
 Output: data/processed/smoke_instrument_district_year.parquet
 
 Usage:
     python src/exposure/smoke_instrument.py
+    python src/exposure/smoke_instrument.py 2010 2011 2012
 
 Requires: geopandas, shapely
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 HMS_DIR  = PROJECT_ROOT / "data" / "raw" / "hms_smoke"
-XWALK    = PROJECT_ROOT / "data" / "crosswalks" / "district_centroids.csv"
+XWALK    = PROJECT_ROOT / "data" / "crosswalks" / "district_crosswalk.csv"
 OUT_DIR  = PROJECT_ROOT / "data" / "processed"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def load_centroids_gdf():
+    try:
+        import geopandas as gpd
+        from shapely.geometry import Point
+    except ImportError:
+        raise ImportError("geopandas and shapely required: pip install geopandas shapely")
+
+    if not XWALK.exists():
+        raise FileNotFoundError(
+            f"District crosswalk not found: {XWALK}\n"
+            "Run: python src/merge/build_crosswalks.py"
+        )
+
+    centroids = pd.read_csv(XWALK).dropna(subset=["lat", "lon"])
+    gdf = gpd.GeoDataFrame(
+        centroids[["leaid", "lat", "lon"]],
+        geometry=gpd.points_from_xy(centroids["lon"], centroids["lat"]),
+        crs="EPSG:4326",
+    )
+    return gdf
 
 
 def load_hms_year(year: int):
@@ -41,7 +66,7 @@ def load_hms_year(year: int):
     if not year_dir.exists():
         return None
 
-    shp_files = sorted(year_dir.glob("**/*.shp"))
+    shp_files = sorted(year_dir.glob("*.shp"))
     if not shp_files:
         return None
 
@@ -49,87 +74,91 @@ def load_hms_year(year: int):
     for shp in shp_files:
         try:
             gdf = gpd.read_file(shp)
-            # Extract date from filename (format: hms_smoke_YYYYMMDD.shp)
-            date_str = shp.stem.replace("hms_smoke_", "").replace("smoke_", "")
-            try:
-                gdf["date"] = pd.to_datetime(date_str, format="%Y%m%d")
-            except Exception:
+            # Filename format: hms_smoke20100101.shp  (no underscore before date)
+            stem = shp.stem  # e.g. "hms_smoke20100101"
+            date_str = stem[-8:]  # last 8 chars = YYYYMMDD
+            gdf["date"] = pd.to_datetime(date_str, format="%Y%m%d", errors="coerce")
+            if gdf["date"].isna().all():
                 continue
-            gdfs.append(gdf[["geometry", "date", "Density"] if "Density" in gdf.columns else ["geometry", "date"]])
+            keep_cols = ["geometry", "date"]
+            if "Density" in gdf.columns:
+                keep_cols.append("Density")
+            gdfs.append(gdf[keep_cols])
         except Exception:
             pass
 
     if not gdfs:
         return None
 
-    combined = pd.concat(gdfs, ignore_index=True)
-    return combined
+    return pd.concat(gdfs, ignore_index=True)
 
 
 def build_smoke_instrument(years: list[int] | None = None) -> pd.DataFrame:
-    if not XWALK.exists():
-        raise FileNotFoundError(
-            f"District centroids not found: {XWALK}\n"
-            "Run: python src/merge/build_crosswalks.py"
-        )
-
     try:
         import geopandas as gpd
-        from shapely.geometry import Point
     except ImportError:
         raise ImportError("geopandas and shapely required: pip install geopandas shapely")
 
-    centroids = pd.read_csv(XWALK)
-    gdf_centroids = gpd.GeoDataFrame(
-        centroids,
-        geometry=[Point(xy) for xy in zip(centroids["lon"], centroids["lat"])],
-        crs="EPSG:4326"
-    )
+    gdf_centroids = load_centroids_gdf()
+    print(f"Loaded {len(gdf_centroids):,} district centroids")
 
     if years is None:
-        years = list(range(2010, 2020))
+        years = [y for y in range(2010, 2020) if (HMS_DIR / str(y)).exists()]
 
-    results = []
+    all_results = []
     for year in years:
         print(f"  Processing {year}...")
-        hms = load_hms_year(year)
-        if hms is None:
+        hms_raw = load_hms_year(year)
+        if hms_raw is None:
             print(f"    No HMS data for {year}")
             continue
 
-        hms_gdf = gpd.GeoDataFrame(hms, geometry="geometry", crs="EPSG:4326")
+        hms_gdf = gpd.GeoDataFrame(hms_raw, geometry="geometry", crs="EPSG:4326")
 
-        # For each district, count days with smoke plume intersection
-        daily_dates = hms_gdf["date"].unique()
-        for _, dist in gdf_centroids.iterrows():
-            point = dist.geometry
-            smoke_days = 0
-            smoke_days_heavy = 0
+        # Spatial join: each day, find which district centroids fall inside a smoke plume
+        # Then count days per district
+        dates = sorted(hms_gdf["date"].dropna().unique())
+        print(f"    {len(dates)} smoke-plume days loaded")
 
-            for date in daily_dates:
-                day_plumes = hms_gdf[hms_gdf["date"] == date]
-                if day_plumes.intersects(point).any():
-                    smoke_days += 1
-                    if "Density" in day_plumes.columns:
-                        if day_plumes[day_plumes.intersects(point)]["Density"].eq("Heavy").any():
-                            smoke_days_heavy += 1
+        # Initialize counters
+        smoke_count = {leaid: 0 for leaid in gdf_centroids["leaid"]}
+        heavy_count = {leaid: 0 for leaid in gdf_centroids["leaid"]}
+        medium_count = {leaid: 0 for leaid in gdf_centroids["leaid"]}
 
-            results.append({
-                "leaid":             dist["leaid"],
-                "year":              year,
-                "smoke_days":        smoke_days,
-                "smoke_days_heavy":  smoke_days_heavy,
-                "smoke_days_pct":    round(smoke_days / len(daily_dates), 4) if daily_dates.size > 0 else 0,
+        for date in dates:
+            day_plumes = hms_gdf[hms_gdf["date"] == date].copy()
+            if day_plumes.empty:
+                continue
+
+            # Spatial join: points in polygons
+            joined = gpd.sjoin(gdf_centroids, day_plumes, how="inner", predicate="within")
+            for leaid in joined["leaid"].unique():
+                smoke_count[leaid] = smoke_count.get(leaid, 0) + 1
+                if "Density" in joined.columns:
+                    rows = joined[joined["leaid"] == leaid]["Density"]
+                    if rows.eq("Heavy").any():
+                        heavy_count[leaid] = heavy_count.get(leaid, 0) + 1
+                    elif rows.eq("Medium").any():
+                        medium_count[leaid] = medium_count.get(leaid, 0) + 1
+
+        for leaid in gdf_centroids["leaid"]:
+            all_results.append({
+                "leaid":              leaid,
+                "year":               year,
+                "smoke_days":         smoke_count.get(leaid, 0),
+                "smoke_days_heavy":   heavy_count.get(leaid, 0),
+                "smoke_days_medium":  medium_count.get(leaid, 0),
             })
 
-    panel = pd.DataFrame(results)
+        print(f"    Done: {sum(1 for v in smoke_count.values() if v > 0):,} districts had smoke days")
+
+    panel = pd.DataFrame(all_results)
     out = OUT_DIR / "smoke_instrument_district_year.parquet"
     panel.to_parquet(out, index=False)
-    print(f"Written: {out}  ({len(panel):,} rows)")
+    print(f"\nWritten: {out}  ({len(panel):,} rows)")
     return panel
 
 
 if __name__ == "__main__":
-    import sys
     years = [int(y) for y in sys.argv[1:]] if len(sys.argv) > 1 else None
     build_smoke_instrument(years)

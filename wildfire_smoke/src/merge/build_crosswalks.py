@@ -27,6 +27,7 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CCD_FILE      = PROJECT_ROOT / "data" / "raw" / "nces" / "ccd_district_directory.csv"
 CENTROIDS     = PROJECT_ROOT / "data" / "crosswalks" / "county_centroids.csv"
+ZIP_COUNTY    = PROJECT_ROOT / "data" / "crosswalks" / "zip_county_fips.csv"
 OUT_FILE      = PROJECT_ROOT / "data" / "crosswalks" / "district_crosswalk.csv"
 
 WESTERN_STATES = ["CA","OR","WA","MT","ID","WY","CO","NV","AZ","NM","UT"]
@@ -54,9 +55,15 @@ def load_ccd(path: Path) -> pd.DataFrame:
 
     # Find county FIPS column — CCD uses CONUM (5-digit county FIPS)
     county_col = find_column(df, ["CONUM","CNTY","COUNTY","LCOUNTY","FIPSCNTY","county_fips"])
+
+    # Fallback: derive county FIPS later from ZIP via zip_county_fips.csv
+    zip_col = find_column(df, ["LZIP","MZIP","ZIP","zip"])
     if not county_col:
         print(f"  Warning: no county FIPS column found. Columns: {list(df.columns)}")
-        print("  Will proceed without county FIPS — check column names above")
+        if zip_col:
+            print(f"  Will derive county FIPS from ZIP column '{zip_col}' via {ZIP_COUNTY.name}")
+        else:
+            print("  No ZIP column found either — county FIPS cannot be derived")
 
     # Find state column
     state_col = find_column(df, ["STABBR","STATE","LSTATE","stateabb"])
@@ -66,6 +73,7 @@ def load_ccd(path: Path) -> pd.DataFrame:
 
     keep = {leaid_col: "leaid"}
     if county_col: keep[county_col] = "county_fips"
+    if not county_col and zip_col: keep[zip_col] = "zip"
     if state_col:  keep[state_col]  = "state"
     if name_col:   keep[name_col]   = "district_name"
 
@@ -76,6 +84,13 @@ def load_ccd(path: Path) -> pd.DataFrame:
         # Normalize to 5-digit string
         out["county_fips"] = (
             out["county_fips"].astype(str).str.strip()
+            .str.replace(r"\.0$","",regex=True)
+            .str.zfill(5)
+        )
+
+    if "zip" in out.columns:
+        out["zip"] = (
+            out["zip"].astype(str).str.strip()
             .str.replace(r"\.0$","",regex=True)
             .str.zfill(5)
         )
@@ -95,6 +110,15 @@ def build_crosswalk() -> pd.DataFrame:
 
     print(f"Loading CCD: {CCD_FILE.name}")
     ccd = load_ccd(CCD_FILE)
+
+    if "county_fips" not in ccd.columns and "zip" in ccd.columns:
+        if not ZIP_COUNTY.exists():
+            raise FileNotFoundError(f"ZIP-to-county crosswalk not found: {ZIP_COUNTY}")
+        print(f"\nDeriving county FIPS from ZIP via {ZIP_COUNTY.name}")
+        zip_lookup = pd.read_csv(ZIP_COUNTY, dtype=str)
+        ccd = ccd.merge(zip_lookup, on="zip", how="left")
+        n_matched = ccd["county_fips"].notna().sum()
+        print(f"  Matched {n_matched:,} / {len(ccd):,} districts to a county FIPS via ZIP")
 
     print(f"\nLoading county centroids: {CENTROIDS.name}")
     cent = pd.read_csv(CENTROIDS)

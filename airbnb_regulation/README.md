@@ -2,7 +2,9 @@
 
 When cities restrict short-term rentals, what actually happens to listings, prices, and availability?
 
-This project uses public Inside Airbnb data and staggered regulatory shocks across cities to estimate treatment effects with modern difference-in-differences methods. The headline case is New York City's Local Law 18 (September 2023), which required hosts to register in person and be present during guest stays. Within weeks, active listings fell from roughly 22,000 to around 4,000.
+This project applies staggered DiD, synthetic control, and event study methods to estimate the causal effect of short-term rental regulation. The headline case is New York City's Local Law 18 (September 2023), which required hosts to register in person and be present during guest stays. Within weeks, active listings fell from roughly 22,000 to around 4,000.
+
+> **Note on data:** This project was designed around Inside Airbnb's historical listing snapshots, which were previously free to download. As of 2025, Inside Airbnb only serves the current snapshot per city — historical files have been removed. The analysis panel therefore uses simulated data that replicates the documented policy impact (NYC listings −81% post-LL18, control cities stable) and the correct panel structure. The causal design, identification strategy, and all methods are unchanged; the underlying numbers are synthetic. See `scripts/generate_data.py` for the DGP.
 
 ---
 
@@ -34,13 +36,19 @@ What is the effect of short-term rental regulation on market outcomes — listin
 | Vienna | Control | No major shock in window |
 | Barcelona | Control | Moratorium announced but not enforced in window |
 
-**Download data:**
+**Simulated panel (default — runs out of the box):**
+```bash
+python scripts/generate_data.py   # writes data/processed/city_month_panel.parquet
+```
+
+**Real data (if Inside Airbnb restores historical access):**
 ```bash
 python scripts/download_inside_airbnb.py   # pulls snapshots to data/raw/
 python scripts/build_real_panel.py          # aggregates to city-month panel
+# Then update DATA_FILE in each notebook to city_month_panel_real.parquet
 ```
 
-The panel grain is city x month with four primary outcomes: `log_listings`, `mean_price_usd`, `availability_rate`, `entire_home_share`.
+The panel grain is city × month with four primary outcomes: `log_listings`, `mean_price_usd`, `availability_rate`, `entire_home_share`.
 
 Treatment dates and policy notes are in `data/regulations.csv`.
 
@@ -84,4 +92,4 @@ Synthetic control: Abadie (2010) weights via `scipy.optimize`.
 
 ## Related
 
-This project is part of a three-project causal inference portfolio. See the [repo root](../) for the full index.
+This project is part of a four-project causal inference portfolio. See the [repo root](../) for the full index.

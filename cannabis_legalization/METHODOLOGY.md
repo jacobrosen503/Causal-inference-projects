@@ -40,6 +40,13 @@ Callaway-Sant'Anna (2021) addresses this by:
 2. Using only never-treated or not-yet-treated states as controls
 3. Aggregating to an overall ATT that is robust to heterogeneous effects
 
+This is implemented from scratch in [`src/cs_did.py`](src/cs_did.py) — the group-time
+ATT(g,t) blocks, the event-study and overall aggregations, and a **state-clustered
+bootstrap** for inference — rather than calling a static TWFE regression and
+relabelling it. Notebook 05 reports the dynamic path (with flat pre-trends as a
+parallel-trends check) and the ATT(g,t) heatmap. The pre-period coefficients are
+genuine placebo tests, not mechanical zeros.
+
 ### Competing Hypotheses
 
 **Traffic fatalities:**

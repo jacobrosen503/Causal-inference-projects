@@ -2,7 +2,7 @@
 
 I'm a data scientist with six years of analytics experience, currently working on the forecasting team at a hotel revenue management company. My day-to-day involves building models on production hospitality data at scale, and I've gotten increasingly interested in moving past predictive modeling toward answering questions about causation.
 
-This repo is where I'm building that out. Each project applies causal inference methods to a real public dataset, working through the full pipeline from naive correlation to a defensible identification strategy. The structure is the same across projects: start with a business or policy question, show why simple regressions fail, then design around the confounding.
+This repo is where I'm building that out. Each project applies causal inference methods to a public dataset, working through the full pipeline from naive correlation to a defensible identification strategy. The structure is the same across projects: start with a business or policy question, show why simple regressions fail, then design around the confounding.
 
 Background: M.S. Data Science (Drexel), B.A. Political Science and Statistics (UT Austin). I work primarily in Python and SQL.
 
@@ -36,11 +36,23 @@ Data: NHTSA FARS (committed), Census population (committed), NYC 311, NY cannabi
 
 ---
 
+### `airbnb_regulation/` -- Airbnb Regulation Impact Study
+
+Does restricting short-term rentals reduce listings — and what's the effect on prices and availability? NYC's Local Law 18 (September 2023) cut active Airbnb listings by ~81% within weeks of enforcement. This project uses that abrupt shock, plus a concurrent Florence historic-centre ban, to estimate treatment effects with staggered DiD and synthetic control.
+
+> Note: Inside Airbnb removed historical snapshots from public access in 2025. The panel uses simulated data replicating the documented LL18 impact; the causal design is unchanged.
+
+Methods: Two-period DiD, event study, Callaway-Sant'Anna staggered DiD, synthetic control (Abadie weights), placebo tests
+
+[airbnb_regulation/](airbnb_regulation/)
+
+---
+
 ### `wildfire_smoke/` -- Wildfire Smoke and Student Achievement (Showpiece)
 
-Does air pollution hurt student test scores? Naive regressions are nearly useless here because poor districts have both worse air quality and worse schools. This project uses wind-driven wildfire smoke as an instrument for PM2.5 exposure, complemented by RDD at EPA AQI thresholds and a Camp Fire event study.
+Does air pollution hurt student test scores? Naive regressions are nearly useless here because poor districts have both worse air quality and worse schools. This project uses wind-driven wildfire smoke as an instrument for PM2.5 exposure, complemented by RDD at EPA AQI thresholds and a Camp Fire event study. The instrument's first stage is strong and clean; the writeup is candid that the second stage does *not* identify a credible effect at annual/district resolution — a deliberate exercise in showing where an IV earns its keep and where it doesn't.
 
-The most complex data pipeline of the three: EPA AQS monitors, NOAA HMS smoke plumes, Stanford SEDA test scores, and Census ACS demographics, merged via spatial joins at the school district level.
+The most complex data pipeline of the four: EPA AQS monitors, NOAA HMS smoke plumes, Stanford SEDA test scores, and Census ACS demographics, merged via spatial joins at the school district level.
 
 Methods: IV/2SLS, RDD, CausalForest DML, event study (Camp Fire 2018)
 

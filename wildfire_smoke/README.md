@@ -2,7 +2,20 @@
 
 Does air pollution hurt student test scores? Naive regressions are nearly useless here — poor districts have both worse air quality and worse schools. This project uses wind-driven wildfire smoke as an instrument for PM2.5 exposure, complemented by regression discontinuity at EPA AQI thresholds and a Camp Fire event study.
 
-This is the technical showpiece of a three-project causal inference portfolio. It combines the most complex data pipeline (EPA AQS, NOAA HMS, Stanford SEDA, Census ACS) with the most demanding identification strategy (IV/2SLS).
+This is the technical showpiece of a four-project causal inference portfolio. It combines the most complex data pipeline (EPA AQS, NOAA HMS, Stanford SEDA, Census ACS) with the most demanding identification strategy (IV/2SLS).
+
+All data in this project is **real**: 110 EPA AQS annual PM2.5 monitor files (11 western states, 2010–2019), 3,647 daily NOAA HMS smoke-plume shapefiles, and Stanford SEDA test scores for 1,900+ western school districts.
+
+> **On the headline result (read this).** The first stage is strong and clean —
+> wildfire smoke is a powerful, well-measured driver of local PM2.5
+> (cluster-robust F ≈ 330). The **second stage is not** a credible health-on-
+> achievement effect: the 2SLS coefficient comes out *positive*, which at this
+> resolution reflects exclusion-restriction violations (smoke-day school
+> closures and test-taker composition), heavy measurement error in
+> monitor-interpolated PM2.5, and a true effect too small for an annual,
+> district-level design to resolve. Notebook 05 walks through this honestly. The
+> value here is the engineering of a strong instrument and a transparent account
+> of where it does and doesn't identify — not an oversold causal number.
 
 ---
 
@@ -93,4 +106,4 @@ pandas, numpy, pyarrow, geopandas, shapely, statsmodels, linearmodels, econml, m
 
 ## Related
 
-Part of a three-project causal inference portfolio. See the [repo root](../) for the full index.
+Part of a four-project causal inference portfolio. See the [repo root](../) for the full index.
