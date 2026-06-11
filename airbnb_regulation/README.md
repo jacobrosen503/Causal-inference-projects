@@ -92,4 +92,4 @@ Synthetic control: Abadie (2010) weights via `scipy.optimize`.
 
 ## Related
 
-This project is part of a four-project causal inference portfolio. See the [repo root](../) for the full index.
+This project is part of a five-project causal inference portfolio. See the [repo root](../) for the full index.

@@ -92,4 +92,4 @@ pandas, numpy, pyarrow, statsmodels, linearmodels, econml, matplotlib, seaborn
 
 ## Related
 
-Part of a four-project causal inference portfolio. See the [repo root](../) for the full index.
+Part of a five-project causal inference portfolio. See the [repo root](../) for the full index.

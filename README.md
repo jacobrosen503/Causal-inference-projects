@@ -10,6 +10,18 @@ Background: M.S. Data Science (Drexel), B.A. Political Science and Statistics (U
 
 ## Projects
 
+### `returns_to_schooling/` -- The Mechanics of OLS (Foundations)
+
+What is regression *actually doing* when it "controls for" a confounder? This project answers that on real data — Wooldridge's NLS wage panel, which uniquely includes IQ scores — by verifying the theorems behind OLS numerically rather than just citing them. The omitted-variable-bias formula reproduces the ability-bias gap to ten decimal places; the Frisch-Waugh-Lovell theorem shows that "controlling for IQ" means physically orthogonalizing schooling against it (and that the third-stage standard error is wrong until you correct the degrees of freedom). Fixed effects are then derived as de-meaning, and OLS as a variance-weighted average — the property that makes staggered-timing TWFE fail. This is the foundation the other four projects build on.
+
+Methods: OLS, omitted variable bias, Frisch-Waugh-Lovell orthogonalization, fixed effects as de-meaning, variance-weighted averaging (→ Goodman-Bacon)
+
+Data: Wooldridge NLS `wage2` (via the `wooldridge` package — no download, no registration)
+
+[returns_to_schooling/](returns_to_schooling/)
+
+---
+
 ### `cruise_cabin_causal/` -- Cabin Mix and Revenue (Semi-Synthetic Demo)
 
 > All data are simulated. No real cruise operator or booking records are described.
@@ -52,7 +64,7 @@ Methods: Two-period DiD, event study, Callaway-Sant'Anna staggered DiD, syntheti
 
 Does air pollution hurt student test scores? Naive regressions are nearly useless here because poor districts have both worse air quality and worse schools. This project uses wind-driven wildfire smoke as an instrument for PM2.5 exposure, complemented by RDD at EPA AQI thresholds and a Camp Fire event study. The instrument's first stage is strong and clean; the writeup is candid that the second stage does *not* identify a credible effect at annual/district resolution — a deliberate exercise in showing where an IV earns its keep and where it doesn't.
 
-The most complex data pipeline of the four: EPA AQS monitors, NOAA HMS smoke plumes, Stanford SEDA test scores, and Census ACS demographics, merged via spatial joins at the school district level.
+The most complex data pipeline in the repo: EPA AQS monitors, NOAA HMS smoke plumes, Stanford SEDA test scores, and Census ACS demographics, merged via spatial joins at the school district level.
 
 Methods: IV/2SLS, RDD, CausalForest DML, event study (Camp Fire 2018)
 
@@ -66,7 +78,7 @@ Data: EPA AQS (API), NOAA HMS shapefiles, Stanford SEDA (registration required),
 
 ```
 pandas, numpy, pyarrow, statsmodels, linearmodels, econml, scikit-learn,
-geopandas, shapely, matplotlib, seaborn
+geopandas, shapely, matplotlib, seaborn, wooldridge
 ```
 
 ---
