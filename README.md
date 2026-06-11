@@ -10,6 +10,20 @@ Background: M.S. Data Science (Drexel), B.A. Political Science and Statistics (U
 
 ## Projects
 
+### `returns_to_schooling/` -- OLS, Confounding, and the Frisch-Waugh-Lovell Theorem
+
+What is the causal return to an additional year of schooling — and what is OLS *actually doing* when it removes confounding bias? Using Wooldridge's NLS-Y `wage2` dataset (935 young men, IQ scores included), this project demonstrates every concept from Facure Ch. 4 on real data: the OVB formula verified to floating-point precision, the FWL three-step decomposition with coefficient and SE identity confirmed, control selection bias-variance tradeoffs, and regression as a variance-weighted average of within-group effects.
+
+The differentiating angle: most demos show that adding controls changes an estimate. This project shows *why* — by orthogonalizing the treatment on real data and watching the IQ quartile offsets physically disappear.
+
+Methods: OLS, Omitted Variable Bias formula, Frisch-Waugh-Lovell decomposition, log transformation, Mincer earnings equation, fixed effects via de-meaning, variance-weighted averaging
+
+Data: Wooldridge `wage2` via `pip install wooldridge` (no download required)
+
+[returns_to_schooling/](returns_to_schooling/)
+
+---
+
 ### `cruise_cabin_causal/` -- Cabin Mix and Revenue (Semi-Synthetic Demo)
 
 > All data are simulated. No real cruise operator or booking records are described.
