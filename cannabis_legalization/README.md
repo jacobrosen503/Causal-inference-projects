@@ -18,7 +18,7 @@ Two linked causal designs studying the effects of recreational cannabis policy u
 
 ## Data
 
-**Download and build (run in Cursor):**
+**Download and build:**
 
 ```bash
 # Part 1 — State-level
@@ -28,7 +28,7 @@ python src/build_fars_panel.py        # builds data/processed/fars_state_year.pa
 python src/build_cdc_panel.py         # builds data/processed/cdc_state_year.parquet
 
 # Part 2 — NYC
-python scripts/download_311.py --auto            # ~1M rows, ~15 min
+python scripts/download_311.py --auto            # ~4.6M rows, ~20-30 min
 python scripts/download_dispensaries.py --auto   # NY cannabis license data
 python src/build_311_panel.py                    # builds nyc_311_zip_month.parquet
 ```
