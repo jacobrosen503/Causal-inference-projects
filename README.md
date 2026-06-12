@@ -22,6 +22,22 @@ Data: Wooldridge NLS `wage2` (via the `wooldridge` package — no download, no r
 
 ---
 
+### `breaking_points/` -- What Topics Drive Views? A Within-Day Fixed Effects Analysis
+
+Does covering foreign policy drive more YouTube views than domestic politics on Breaking Points? The channel publishes 5–8 segments per day, each on a different topic, with the same host pair — creating a natural within-day control group. Day fixed effects absorb host identity, news-cycle magnitude, and algorithmic day-level variation, leaving within-day topic contrasts as the sole identification source.
+
+A variance decomposition confirms the design is viable (47.9% of log-view variance is within-day). The FE estimates show Foreign Policy/War as the dominant topic, with Domestic Politics and Legal/Courts underperforming by 32–34%. The project also documents — via an 80% DOW-to-host-pair prediction accuracy check — why host effects cannot be identified from 7 weeks of data without rotation disruptions, and proposes the full 3-year archive as the extension that would recover them.
+
+Data pipeline: `yt-dlp` for metadata (no video download), Claude Haiku API for batch topic classification (~$0.10 for 200 videos), host labels parsed from video descriptions.
+
+Methods: Day fixed effects, OLS, variance decomposition, within-day identification
+
+Data: YouTube metadata (200 segments, 7 weeks) + Claude Haiku topic labels
+
+[breaking_points/](breaking_points/)
+
+---
+
 ### `cruise_cabin_causal/` -- Cabin Mix and Revenue (Semi-Synthetic Demo)
 
 > All data are simulated. No real cruise operator or booking records are described.
